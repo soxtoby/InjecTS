@@ -1,0 +1,17 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "target": "es5",
+        "lib": [
+            "es2015",
+            "es2015.symbol",
+            "es2017.object",
+            "es2015.reflect"
+        ]
+    }
+}
