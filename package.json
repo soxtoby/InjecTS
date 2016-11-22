@@ -1,0 +1,27 @@
+{
+  "name": "injects",
+  "version": "1.0.0",
+  "description": "Dependency injection for TypeScript",
+  "main": "src/injec.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "dependency",
+    "injection",
+    "typescript"
+  ],
+  "author": "Simon Oxtoby",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chai": "^3.4.34",
+    "@types/sinon": "^1.16.32",
+    "@types/sinon-chai": "^2.7.27",
+    "chai": "^3.5.0",
+    "sinon": "^1.17.6",
+    "systemjs": "^0.19.41"
+  }
+}

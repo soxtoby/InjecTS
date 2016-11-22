@@ -21,3 +21,4 @@ obj/
 _ReSharper*/
 .vscode/
 src/*.js
+node_modules/*
