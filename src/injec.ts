@@ -112,6 +112,15 @@ class FallbackContainerLookup implements IParentLookup<Dependency, Binding<any>>
     }
 }
 
+export function ctor(dependencies: Dependency[], fn: Function) {
+    if (dependencies.length != fn.length) {
+        var dependenciesMsg = dependencies.length == 1 ? "1 dependency" : dependencies.length + " dependencies",
+            paramsMsg = fn.length == 1 ? "1 parameter" : fn.length + " parameters";
+        throw new Error(name(fn) + " has " + dependenciesMsg + ", but " + paramsMsg);
+    }
+    return dependant(dependencies, fn);
+}
+
 interface IParentContainer {
     registeredBindings: IParentLookup<Dependency, Binding<any>>;
     resolve(key: Dependency): any;

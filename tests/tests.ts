@@ -286,14 +286,6 @@ describe("inject.js", function () {
                     });
                 });
 
-                // when("resolving named dependency", () => {
-                //     let result = new inject.Container([registration]).resolve(inject.named(type, key));
-
-                //     it("resolves to instance of the registered type", () => {
-                //         result.should.be.an.instanceOf(type);
-                //     });
-                // });
-
                 when("another type is registered with a different name", () => {
                     function type2() { }
                     let binding2 = inject.bind('different').toType(type2);
@@ -613,7 +605,7 @@ describe("inject.js", function () {
             });
         });
 
-        when("registering a null value for a type", () => { // FIXME: Is this right?
+        when("registering a null value for a type", () => {
             let registration = inject.bind<type | null>(type).toValue(null);
 
             when("type is resolved", () => {
@@ -1087,28 +1079,6 @@ describe("inject.js", function () {
             });
         });
 
-        when("resolving to wrong type", () => { // FIXME this should work now, to allow for abstract classes as interfaces
-            let sut = new inject.Container([inject.bind(type).to(function () { return {} as any; })]);
-            let action = function () { sut.resolve(type); };
-
-            it("throws", () => {
-                action.should.throw('Value does not inherit from type');
-            });
-        });
-
-        when("resolving named dependency to wrong type", () => {
-            inject.Injectable
-            class TypeWithNamedDependency {
-                constructor(@inject.Named('foo') dep: type) { }
-            }
-            let sut = new inject.Container([inject.bind('foo').toValue({})]);
-            let action = () => sut.resolve(TypeWithNamedDependency);
-
-            it("throws", () => {
-                action.should.throw('Value does not inherit from type');
-            });
-        });
-
         when("resolving type whose dependency resolves to undefined", () => {
             let sut = new inject.Container([
                 inject.bind(dependency1).to(() => undefined as any)
@@ -1124,7 +1094,9 @@ describe("inject.js", function () {
         when("resolve error occurs with multiple resolves in chain", () => {
             @inject.Injectable
             class three { constructor(@inject.Named('four') d: any) { } }
+            @inject.Injectable
             class two { constructor(@inject.Named('three') d: any) { } }
+            @inject.Injectable
             class one { constructor(d: two) { } }
 
             let sut = new inject.Container([
@@ -1159,35 +1131,11 @@ describe("inject.js", function () {
                 });
             });
 
-            when("creating an unnamed non-subtype", () => { // FIXME: this needs to work for abstract classes as interfaces
-                let action = function () { registration.toType(function () { }); };
-
-                it("throws", () => {
-                    action.should.throw('Anonymous type does not inherit from type');
-                });
-            });
-
-            when("creating a named non-subtype", () => { // FIXME: this needs to work for abstract classes as interfaces
-                let action = function () { registration.toType(function nonSubType() { }); };
-
-                it("throws with non-subtype name in message", () => {
-                    action.should.throw('nonSubType does not inherit from type');
-                });
-            });
-
             when("using an undefined value", () => {
                 let action = function () { registration.toValue(undefined as any); };
 
                 it("throws", () => {
                     action.should.throw('Value is undefined');
-                });
-            });
-
-            when("using a value of the wrong type", () => { // FIXME: this needs to work for abstract classes as interfaces
-                let action = function () { registration.toValue({}); };
-
-                it("throws", () => {
-                    action.should.throw('Value does not inherit from type');
                 });
             });
 
@@ -1216,16 +1164,7 @@ describe("inject.js", function () {
             });
         });
 
-        when("registering a typed parameter with wrong type", () => { // FIXME: this needs to work for abstract classes as interfaces
-            let registration = inject.bind('foo');
-            let action = function () { registration.withDependency(type, {}); };
-
-            it("throws", () => {
-                action.should.throw("Value does not inherit from type");
-            });
-        });
-
-        when("specifying undefined dependency for named function", () => { // FIXME: was for ctor
+        when("specifying undefined dependency for named function", () => {
             let action = specifyUndefinedDependency(function UndefinedDependencyType(u: any) { });
 
             it("throws", () => {
@@ -1233,7 +1172,7 @@ describe("inject.js", function () {
             });
         });
 
-        when("specifying undefined dependency for unnamed function", () => { // FIXME: was for ctor
+        when("specifying undefined dependency for unnamed function", () => {
             let action = specifyUndefinedDependency(function (u: any) { });
 
             it("throws", () => {
@@ -1245,23 +1184,15 @@ describe("inject.js", function () {
             return function () { inject.dependant([undefined as any], constructor); };
         }
 
-        when("specifying wrong number of dependencies in constructor", () => { // FIXME: was for ctor
+        when("specifying wrong number of dependencies in constructor", () => {
             it("throws", () => {
                 (function () {
-                    inject.dependant(['foo', 'bar'], function (baz: any) { });
+                    inject.ctor(['foo', 'bar'], function (baz: any) { });
                 }).should.throw("Type has 2 dependencies, but 1 parameter");
 
                 (function () {
-                    inject.dependant(['foo'], function () { });
+                    inject.ctor(['foo'], function () { });
                 }).should.throw("Type has 1 dependency, but 0 parameters");
-            });
-        });
-
-        when("specifying too many dependencies in dependant function", function () { // FIXME: was for ctor
-            it("throws", function () {
-                (function () {
-                    inject.dependant(['foo', 'bar'], function (baz: any) { });
-                }).should.throw("Type has more dependencies than parameters");
             });
         });
     });
