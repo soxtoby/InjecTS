@@ -14,8 +14,8 @@ describe("inject.js", function () {
     class type { }
     class dependency1 { }
     class dependency2 { }
+    @inject.Injectable
     class typeWithDependencies {
-        static dependencies = [dependency1, dependency2];
         constructor(public dependency1: dependency1, public dependency2: dependency2) { }
     }
     class disposableType extends type {
@@ -1049,9 +1049,9 @@ describe("inject.js", function () {
             });
 
             when("resolving type with an unregistered named dependency", () => {
+                @inject.Injectable
                 class typeWithNamedDependency {
-                    static dependencies = ['unregistered'];
-                    constructor(d1: any) { }
+                    constructor(@inject.Named('unregistered')  d1: any) { }
                 }
                 let action = () => { sut.resolve(typeWithNamedDependency); };
 
@@ -1122,9 +1122,10 @@ describe("inject.js", function () {
         });
 
         when("resolve error occurs with multiple resolves in chain", () => {
-            class three { static dependencies = ['four']; }
-            class two { static dependencies = ['three']; }
-            class one { static dependencies = [two]; }
+            @inject.Injectable
+            class three { constructor(@inject.Named('four') d: any) { } }
+            class two { constructor(@inject.Named('three') d: any) { } }
+            class one { constructor(d: two) { } }
 
             let sut = new inject.Container([
                 inject.bind('three').toType(three),

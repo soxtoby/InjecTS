@@ -25,7 +25,15 @@ interface IFunctionBinding<TFunc extends TResult, TResult> extends Binding<TFunc
     toFunction(fn: Func<TResult>): this;
 }
 
-export const Injectable: ClassDecorator = (target: Function) => target;
+export const Injectable: ClassDecorator = (ctor: Function) => {
+    let ctorParamTypes: Constructor<any>[] = Reflect.getMetadata('design:paramtypes', ctor) || [];
+    ctorParamTypes.forEach((type, parameterIndex) => {
+        let deps = getDependencies(ctor);
+        if (type != Object && !deps[parameterIndex])
+            deps[parameterIndex] = type;
+    });
+    return ctor;
+};
 
 export interface ConstructorParameterDecorator {
     (target: Function, propertyKey: undefined, parameterIndex: number): void;
@@ -35,7 +43,7 @@ export function Named(name: string | symbol): ConstructorParameterDecorator {
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
             throw new Error("@Named is only allowed on constructor parameters");
-        dependencyOverrides(target)[parameterIndex] = name;
+        getDependencies(target)[parameterIndex] = name;
     };
 }
 
@@ -46,7 +54,7 @@ export function Optional<T>(key: Dependency, defaultValue?: T): ConstructorParam
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
             throw new Error("@Optional is only allowed on constructor parameters");
-        dependencyOverrides(target)[parameterIndex] = optional(key, defaultValue);
+        getDependencies(target)[parameterIndex] = optional(key, defaultValue);
     };
 }
 
@@ -54,7 +62,7 @@ export function All<T>(key: Dependency): ConstructorParameterDecorator {
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
             throw new Error("@All is only allowed on constructor parameters");
-        dependencyOverrides(target)[parameterIndex] = all(key);
+        getDependencies(target)[parameterIndex] = all(key);
     };
 }
 
@@ -65,15 +73,8 @@ export function Factory<T>(key: Dependency, funcDependencies: Dependency[] = [])
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
             throw new Error("@Factory is only allowed on constructor parameters");
-        dependencyOverrides(target)[parameterIndex] = makeFactory(key, funcDependencies);
+        getDependencies(target)[parameterIndex] = makeFactory(key, funcDependencies);
     };
-}
-
-function dependencyOverrides(ctor: Function): Dependency[] {
-    let overrides: Dependency[] = Reflect.getMetadata(dependencyOverrideKey, ctor);
-    if (!overrides)
-        Reflect.defineMetadata(dependencyOverrideKey, overrides = [], ctor);
-    return overrides;;
 }
 
 export function fallback(fallbackFn: (key: Dependency) => any, parentContainer?: IParentContainer) {
@@ -156,7 +157,7 @@ export class Container implements IParentContainer, IDisposable {
     resolveFunction<T>(fn: Func<T>, localKeys: Dependency[] = [], localValues: any[] = []) {
         let self = this;
         return function (...args: any[]): T {
-            return fn.apply(this, self.resolveDependencies(dependencies(fn), localKeys || [], localValues || []).concat(args));
+            return fn.apply(this, self.resolveDependencies(getDependencies(fn), localKeys || [], localValues || []).concat(args));
         }
     }
 
@@ -255,7 +256,7 @@ export class Binding<T> implements Binding<T> {
     }
 
     then(callback: (value: T) => void) {
-        return this.withFactory(innerFactory => dependant(dependencies(innerFactory), (...args: any[]) => {
+        return this.withFactory(innerFactory => dependant(getDependencies(innerFactory), (...args: any[]) => {
             let value = innerFactory(...args);
             callback(value);
             return value;
@@ -266,7 +267,7 @@ export class Binding<T> implements Binding<T> {
         verifyIsFunction(hook, "Parameter hook");
 
         return this.withFactory(innerFactory => dependant([Container, locals], (c: Container, local: Locals) => {
-            let originalDependencies = dependencies(innerFactory);
+            let originalDependencies = getDependencies(innerFactory);
             let hookedDependencies = originalDependencies.map(dep => {
                 let hookValue = hook(c, dep);
                 return isDefined(hookValue)
@@ -287,7 +288,7 @@ export class Binding<T> implements Binding<T> {
     }
 
     withArguments(...args: any[]) {
-        return this.withFactory(innerFactory => dependant(dependencies(innerFactory).slice(args.length), (...rest: any[]) => innerFactory(...args, ...rest)));
+        return this.withFactory(innerFactory => dependant(getDependencies(innerFactory).slice(args.length), (...rest: any[]) => innerFactory(...args, ...rest)));
     }
 
     build(container: Container, scope: Scope) {
@@ -305,8 +306,11 @@ function resolveChainMessage() {
         : '';
 }
 
-function dependencies(ctor: any): Dependency[] { // TODO typing
-    return ctor.dependencies || [];
+function getDependencies(ctor: Function): Dependency[] {
+    let overrides: Dependency[] = Reflect.getMetadata(dependencyOverrideKey, ctor);
+    if (!overrides)
+        Reflect.defineMetadata(dependencyOverrideKey, overrides = [], ctor);
+    return overrides;
 }
 
 function name(key: Dependency) {
@@ -438,14 +442,15 @@ function defaultArg<T>(arg: T | undefined, defaultValue: T) {
 }
 
 function constructor<T>(fn: Constructor<T>): Func<T> {
-    return dependant(dependencies(fn), (...args: any[]) => Reflect.construct(fn, args));
+    return dependant(getDependencies(fn), (...args: any[]) => Reflect.construct(fn, args));
 }
 
 export function dependant<T extends Function>(dependencies: Dependency[], fn: T) {
     if (dependencies.some(notDefined))
         throw new Error(name(fn) + " has an undefined dependency");
 
-    return Object.assign(fn, { dependencies: dependencies });
+    getDependencies(fn).splice(0, Number.MAX_VALUE, ...dependencies);
+    return fn;
 }
 
 function flatMap<TIn, TOut>(array: TIn[], mapFn: (item: TIn) => TOut[]): TOut[] {
