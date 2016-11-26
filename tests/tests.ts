@@ -1,12 +1,14 @@
-﻿import * as chai from "chai";
+import * as chai from "chai";
 import * as sinon from "sinon";
-import "sinon-chai";
-import "lib/basil/basil";
-import "lib/basil/basil";
+import * as sinonChai from "sinon-chai";
+import "./sinon-basil";
+import "./lib/basil/basil-browser-runner";
+import "reflect-metadata";
 import * as inject from "../src/injec";
 
 let expect = chai.expect;
 chai.should();
+chai.use(sinonChai);
 
 describe("inject.js", function () {
     class type { }
@@ -90,32 +92,6 @@ describe("inject.js", function () {
             });
         });
 
-        when("resolving existing dependant function", function () {
-            let expectedResult = 'baz';
-            let functionWithDependencies = sinon.spy(function (d1: dependency1, d2: dependency2, p1: any, p2: any) { return expectedResult; });
-            let dependantFunction = inject.dependant([dependency1, dependency2], functionWithDependencies);
-            let result = sut.resolve(dependantFunction);
-
-            it("resolves to a function", function () {
-                result.should.be.a('function');
-            });
-
-            when("result is called", function () {
-                let resultResult = result('foo', 'bar');
-
-                then("function is called with dependencies and passed in arguments", function () {
-                    functionWithDependencies.should.have.been.calledWith(
-                        sinon.match.instanceOf(dependency1),
-                        sinon.match.instanceOf(dependency2),
-                        'foo', 'bar');
-                });
-
-                it("returns function return value", () => {
-                    resultResult.should.equal(expectedResult);
-                });
-            });
-        });
-
         when("resolving a container", () => {
             let result = sut.resolve(inject.Container);
 
@@ -165,7 +141,7 @@ describe("inject.js", function () {
             });
 
             when("resolving injected binding without a fallback value", () => {
-                let result = sut.defaultBinding('bar');
+                let result = sut.registeredBindings.get('bar');
 
                 then("binding is undefined", () => {
                     expect(result).to.be.undefined;
@@ -214,15 +190,13 @@ describe("inject.js", function () {
 
     describe("type registration", () => {
         when("setting up a registration for a type", () => {
-            let registration = inject.bind(type);
+            let binding = inject.bind(type);
 
             when("subtype created for type", () => {
-                let chain = registration.toType(subType);
-                let sut = new inject.Container([registration]);
+                let subTypeBinding = binding.toType(subType);
+                let sut = new inject.Container([subTypeBinding]);
 
-                it("can be chained", () => {
-                    chain.should.equal(registration);
-                });
+                isABinding(subTypeBinding);
 
                 when("resolving type", () => {
                     let result = sut.resolve(type);
@@ -235,12 +209,10 @@ describe("inject.js", function () {
 
             when("value used for type", () => {
                 let value = new disposableType();
-                let chain = registration.toValue(value);
-                let sut = new inject.Container([registration]);
+                let valueBinding = binding.toValue(value);
+                let sut = new inject.Container([valueBinding]);
 
-                it("can be chained", () => {
-                    chain.should.equal(registration);
-                });
+                isABinding(valueBinding);
 
                 when("type is resolved", () => {
                     let result = sut.resolve(type);
@@ -260,18 +232,30 @@ describe("inject.js", function () {
             });
 
             when("bound to simple factory", () => {
-                throw Error("Not implemented");
+                let expectedResult = new type();
+                let simpleFactory = sinon.stub();
+                let factoryBinding = binding.to(simpleFactory);
+                let sut = new inject.Container([factoryBinding]);
+                simpleFactory.withArgs(sut).returns(expectedResult);
+
+                isABinding(factoryBinding);
+
+                when("type is resolved", () => {
+                    let result = sut.resolve(type);
+
+                    it("resolves to factory return value", () => {
+                        result.should.equal(expectedResult);
+                    });
+                });
             });
 
             when("factory method called for type", () => {
                 let expectedResult = new type();
                 let factory = inject.dependant([dependency1], sinon.stub().returns(expectedResult));
-                let chain = registration.withFactory(() => factory);
-                let sut = new inject.Container([registration]);
+                let factoryBinding = binding.withFactory(() => factory);
+                let sut = new inject.Container([factoryBinding]);
 
-                it("can be chained", () => {
-                    chain.should.equal(registration);
-                });
+                isABinding(factoryBinding);
 
                 when("type is resolved", () => {
                     let result = sut.resolve(type);
@@ -289,13 +273,13 @@ describe("inject.js", function () {
 
         when("setting up a registration for a key", () => {
             let key = 'named';
-            let registration = inject.bind(key);
+            let binding = inject.bind(key);
 
             when("type created for key", () => {
-                registration.toType(type);
+                let typeBinding = binding.toType(type);
 
                 when("resolving key", () => {
-                    let result = new inject.Container([registration]).resolve(key);
+                    let result = new inject.Container([typeBinding]).resolve(key);
 
                     it("resolves to instance of the registered type", () => {
                         result.should.be.an.instanceOf(type);
@@ -312,8 +296,8 @@ describe("inject.js", function () {
 
                 when("another type is registered with a different name", () => {
                     function type2() { }
-                    let reg2 = inject.bind('different').toType(type2);
-                    let sut = new inject.Container([registration, reg2]);
+                    let binding2 = inject.bind('different').toType(type2);
+                    let sut = new inject.Container([typeBinding, binding2]);
 
                     when("resolving first name", () => {
                         let result = sut.resolve(key);
@@ -337,14 +321,12 @@ describe("inject.js", function () {
                 let expectedResult = 'baz';
                 let func = inject.dependant([dependency1, dependency2], sinon.stub());
                 func.returns(expectedResult);
-                let chain = registration.toFunction(func);
+                let functionBinding = binding.toFunction(func);
 
-                it("can be chained", () => {
-                    chain.should.equal(registration);
-                });
+                isABinding(functionBinding);
 
                 when("resolving key", () => {
-                    let result = new inject.Container([registration]).resolve(key) as sinon.SinonStub;
+                    let result = new inject.Container([functionBinding]).resolve(key) as sinon.SinonStub;
 
                     then("result is a function", () => {
                         result.should.be.a('function');
@@ -368,7 +350,7 @@ describe("inject.js", function () {
                 });
 
                 when("resolving factory function with partial parameters", () => {
-                    let sut = new inject.Container([registration]);
+                    let sut = new inject.Container([functionBinding]);
                     let factory = sut.resolve(inject.makeFactory(key, [dependency2]));
 
                     when("calling factory function", () => {
@@ -400,10 +382,10 @@ describe("inject.js", function () {
 
             when("factory called for key, returning a string", () => {
                 let expectedResult = 'baz';
-                registration.to(() => expectedResult);
+                let factoryBinding = binding.to(() => expectedResult);
 
                 when("resolving key", () => {
-                    let sut = new inject.Container([registration]);
+                    let sut = new inject.Container([factoryBinding]);
                     let result = sut.resolve(key);
 
                     then("result is the factory return value", () => {
@@ -481,7 +463,7 @@ describe("inject.js", function () {
             let registration = inject.bind(type);
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("type is resolved", () => {
                 let result = sut.resolve(type);
@@ -530,7 +512,7 @@ describe("inject.js", function () {
             let registration = inject.bind(type, subType).toType(subType);
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("both types are resolved", () => {
                 let result1 = sut.resolve(type);
@@ -548,7 +530,7 @@ describe("inject.js", function () {
             let registration = inject.bind(key1, key2).toType(type);
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("both keys are resolved", () => {
                 let result1 = sut.resolve(key1);
@@ -565,7 +547,7 @@ describe("inject.js", function () {
             let registration = inject.bind(type).once();
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("resolving type twice", () => {
                 let result1 = sut.resolve(type);
@@ -588,11 +570,7 @@ describe("inject.js", function () {
             let registration = inject.bind(type).withFactory(() => factory);
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
-
-            it("can be chained", () => {
-                registration.should.be.an.instanceOf(inject.Binding);
-            });
+            isABinding(registration);
 
             when("factory returns instance of type & type is resolved", () => {
                 let expectedResult = new type();
@@ -624,7 +602,7 @@ describe("inject.js", function () {
             let registration = inject.bind('key').toValue(value);
             let sut = new inject.Container([registration]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("key is resolved", () => {
                 let result = sut.resolve('key');
@@ -651,8 +629,8 @@ describe("inject.js", function () {
             let callback = sinon.spy(function (o: any) {
                 o.callbackProperty = true;
             });
-            let registration = inject.bind(type).then(callback);
-            let sut = new inject.Container([registration]);
+            let binding = inject.bind(type).then(callback);
+            let sut = new inject.Container([binding]);
 
             when("type is resolved", () => {
                 let result = sut.resolve(type);
@@ -670,7 +648,7 @@ describe("inject.js", function () {
             let registration = inject.bind('key').toFunction(func);
             let sut = new inject.Container([registration, inject.bind(dependency2).perDependency()]);
 
-            isARegistration(registration);
+            isABinding(registration);
 
             when("key is resolved", () => {
                 let result = sut.resolve('key') as sinon.SinonStub;
@@ -705,24 +683,18 @@ describe("inject.js", function () {
                 });
             });
         });
-
-        function isARegistration(registration: inject.Binding<any>) {
-            then("registration is returned", () => {
-                registration.should.be.an.instanceOf(inject.Binding);
-            });
-        }
     });
 
     describe("parameter registration", () => {
-        let typeRegistration = inject.bind(typeWithDependencies);
+        let typeBinding = inject.bind(typeWithDependencies);
 
         when("type is registered with parameter hook", () => {
             let dependency1Instance = new dependency1();
             let parameterResolver = sinon.spy(function (c: inject.Container, d: inject.Dependency) {
                 if (d == dependency1) return dependency1Instance;
             });
-            typeRegistration.useParameterHook(parameterResolver);
-            let sut = new inject.Container([typeRegistration]);
+            let hookedBinding = typeBinding.useParameterHook(parameterResolver);
+            let sut = new inject.Container([hookedBinding]);
 
             when("type is resolved", () => {
                 let result = sut.resolve(typeWithDependencies);
@@ -743,14 +715,12 @@ describe("inject.js", function () {
 
         when("registering a typed parameter", () => {
             let dependency2Instance = new dependency2();
-            let chain = typeRegistration.withDependency(dependency2, dependency2Instance);
+            let configuredBinding = typeBinding.withDependency(dependency2, dependency2Instance);
 
-            it("can be chained", () => {
-                chain.should.equal(typeRegistration);
-            });
+            isABinding(configuredBinding);
 
             when("type is resolved", () => {
-                let sut = new inject.Container([typeRegistration]);
+                let sut = new inject.Container([configuredBinding]);
                 let result = sut.resolve(typeWithDependencies);
 
                 then("type is resolved with specified value", () => {
@@ -762,14 +732,12 @@ describe("inject.js", function () {
         when("registering arguments", () => {
             let dependency1Instance = new dependency1();
             let dependency2Instance = new dependency2();
-            let chain = typeRegistration.withArguments(dependency1Instance, dependency2Instance);
+            let configuredBinding = typeBinding.withArguments(dependency1Instance, dependency2Instance);
 
-            it("can be chained", () => {
-                chain.should.equal(typeRegistration);
-            });
+            isABinding(configuredBinding);
 
             when("type is resolved", () => {
-                let sut = new inject.Container([typeRegistration]);
+                let sut = new inject.Container([configuredBinding]);
                 let result = sut.resolve(typeWithDependencies);
 
                 then("type is resolved with specified values", () => {
@@ -870,13 +838,11 @@ describe("inject.js", function () {
         });
 
         when("registered as singleton in outer container", () => {
-            let registration = inject.bind(disposableType);
-            let chain = registration.once();
-            let outer = new inject.Container([registration]);
+            let binding = inject.bind(disposableType);
+            let singletonBinding = binding.once();
+            let outer = new inject.Container([singletonBinding]);
 
-            it("can be chained", () => {
-                chain.should.equal(registration);
-            });
+            isABinding(singletonBinding);
 
             when("resolved twice from same container", () => {
                 let result1 = outer.resolve(disposableType);
@@ -978,22 +944,18 @@ describe("inject.js", function () {
             let chain = registration.perContainer();
             let outer = new inject.Container([registration]);
 
-            it("can be chained", () => {
-                chain.should.equal(registration);
-            });
+            isABinding(chain);
 
             assertInstancePerContainerLifeTime(outer);
         });
 
         when("registered with instance per dependency lifetime", () => {
-            let registration = inject.bind(disposableType);
-            let chain = registration.perDependency();
+            let binding = inject.bind(disposableType);
+            let perDependencyBinding = binding.perDependency();
 
-            let sut = new inject.Container([registration]);
+            let sut = new inject.Container([perDependencyBinding]);
 
-            it("can be chained", () => {
-                chain.should.equal(registration);
-            });
+            isABinding(perDependencyBinding);
 
             when("type is resolved twice", () => {
                 let result1 = sut.resolve(disposableType);
@@ -1088,7 +1050,7 @@ describe("inject.js", function () {
 
             when("resolving type with an unregistered named dependency", () => {
                 class typeWithNamedDependency {
-                    static dependencies: ['unregistered'];
+                    static dependencies = ['unregistered'];
                     constructor(d1: any) { }
                 }
                 let action = () => { sut.resolve(typeWithNamedDependency); };
@@ -1160,9 +1122,9 @@ describe("inject.js", function () {
         });
 
         when("resolve error occurs with multiple resolves in chain", () => {
-            let three = inject.dependant(['four'], function(p: any) { });
-            let two = inject.dependant(['three'], function(p: any) { });
-            let one = inject.dependant([two], function(p: any) { });
+            class three { static dependencies = ['four']; }
+            class two { static dependencies = ['three']; }
+            class one { static dependencies = [two]; }
 
             let sut = new inject.Container([
                 inject.bind('three').toType(three),
@@ -1181,7 +1143,7 @@ describe("inject.js", function () {
             let action = function () { inject.bind({} as any); };
 
             it("throws", () => {
-                action.should.throw('Registration type is not a function');
+                action.should.throw(String({}) + ' is not a valid key to bind to');
             });
         });
 
@@ -1240,7 +1202,7 @@ describe("inject.js", function () {
                 let action = function () { registration.toFunction(function () { }); };
 
                 it("throws", () => {
-                    action.should.throw("A function can only be registered for a string key or itself");
+                    action.should.throw("Only strings and symbols can be bound to functions");
                 });
             });
 
@@ -1259,15 +1221,6 @@ describe("inject.js", function () {
 
             it("throws", () => {
                 action.should.throw("Value does not inherit from type");
-            });
-        });
-
-        when("injecting a registration with no factory", () => {
-            let registration = inject.bind('foo');
-            let action = function () { new inject.Container([registration]); };
-
-            it("throws", () => {
-                action.should.throw("No factory defined for 'foo' registration");
             });
         });
 
@@ -1303,7 +1256,7 @@ describe("inject.js", function () {
             });
         });
 
-        when("specifying too many dependencies in dependant function", function () {
+        when("specifying too many dependencies in dependant function", function () { // FIXME: was for ctor
             it("throws", function () {
                 (function () {
                     inject.dependant(['foo', 'bar'], function (baz: any) { });
@@ -1311,6 +1264,12 @@ describe("inject.js", function () {
             });
         });
     });
+
+    function isABinding(registration: inject.Binding<any>) {
+        then("binding is returned", () => {
+            registration.should.be.an.instanceOf(inject.Binding);
+        });
+    }
 
     function assertFactoryFunctionLifeTime(sut: inject.Container) {
         when("factory function resolved", () => {

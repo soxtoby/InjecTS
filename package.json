@@ -4,7 +4,8 @@
   "description": "Dependency injection for TypeScript",
   "main": "src/injec.js",
   "directories": {
-    "test": "tests"
+    "test": "tests",
+    "packages": "jspm_packages"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,8 +21,18 @@
     "@types/chai": "^3.4.34",
     "@types/sinon": "^1.16.32",
     "@types/sinon-chai": "^2.7.27",
-    "chai": "^3.5.0",
-    "sinon": "^1.17.6",
-    "systemjs": "^0.19.41"
+    "jspm": "^0.16.48"
+  },
+  "jspm": {
+    "directories": {
+      "test": "tests"
+    },
+    "dependencies": {
+      "chai": "npm:chai@^3.5.0",
+      "reflect-metadata": "npm:reflect-metadata@^0.1.8",
+      "sinon": "npm:sinon@^1.17.6",
+      "sinon-chai": "npm:sinon-chai@^2.8.0"
+    },
+    "devDependencies": {}
   }
 }

@@ -3,10 +3,10 @@
 <head>
     <title>Injec Tests</title>
     <link href="lib/basil/basil-browser-runner.css" rel="stylesheet" />
-    <script src="/node_modules/systemjs/dist/system.js"></script>
+    <script src="/jspm_packages/system.js"></script>
+    <script src="/config.js"></script>
     <script>
-        system.config({ defaultJSExtensions: true });
-        system.import("tests");
+        System.import("./tests");
     </script>
 </head>
 <body>

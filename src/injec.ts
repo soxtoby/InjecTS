@@ -6,7 +6,8 @@ let locals = Symbol('inject.locals');
 let resolveChain = <Dependency[]>[];
 const dependencyOverrideKey = 'design:dependencyOverrides';
 
-export type Dependency = string | symbol | Constructor<any> | Binding<any>;
+export type BindableKey = string | symbol | Constructor<any>;
+export type Dependency = BindableKey | Binding<any>;
 type Constructor<T> = Function & ({ new (...args: any[]): T } | { prototype: T });
 type Locals = { keys: Dependency[], values: any[] };
 type Func<T> = (...args: any[]) => T;
@@ -16,7 +17,7 @@ export function bind<T1, T2>(type1: Constructor<T1>, type2: Constructor<T2>): Bi
 export function bind<T1, T2, T3>(type1: Constructor<T1>, type2: Constructor<T2>, type3: Constructor<T3>): Binding<T1 & T2 & T3>
 export function bind<T1, T2, T3, T4>(type1: Constructor<T1>, type2: Constructor<T2>, type3: Constructor<T3>, type4: Constructor<T4>): Binding<T1 & T2 & T3 & T4>
 export function bind<T>(...names: (string | symbol)[]): Binding<T>
-export function bind(...keys: Dependency[]) {
+export function bind(...keys: BindableKey[]) {
     return Binding.from(keys);
 }
 
@@ -45,7 +46,6 @@ export function Optional<T>(key: Dependency, defaultValue?: T): ConstructorParam
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
             throw new Error("@Optional is only allowed on constructor parameters");
-
         dependencyOverrides(target)[parameterIndex] = optional(key, defaultValue);
     };
 }
@@ -53,7 +53,7 @@ export function Optional<T>(key: Dependency, defaultValue?: T): ConstructorParam
 export function All<T>(key: Dependency): ConstructorParameterDecorator {
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
-            throw new Error("@Optional is only allowed on constructor parameters");
+            throw new Error("@All is only allowed on constructor parameters");
         dependencyOverrides(target)[parameterIndex] = all(key);
     };
 }
@@ -64,8 +64,8 @@ export function Factory<T>(key: Dependency, funcDependencies?: Dependency[]): Co
 export function Factory<T>(key: Dependency, funcDependencies: Dependency[] = []): ConstructorParameterDecorator {
     return (target: Function, propertyKey: undefined, parameterIndex: number) => {
         if (propertyKey)
-            throw new Error("@Optional is only allowed on constructor parameters");
-        dependencyOverrides(target)[parameterIndex] = makeFactory(key, funcDependencies) ;
+            throw new Error("@Factory is only allowed on constructor parameters");
+        dependencyOverrides(target)[parameterIndex] = makeFactory(key, funcDependencies);
     };
 }
 
@@ -77,18 +77,42 @@ function dependencyOverrides(ctor: Function): Dependency[] {
 }
 
 export function fallback(fallbackFn: (key: Dependency) => any, parentContainer?: IParentContainer) {
-    let fallbackResolve = new Container();
-    parentContainer = parentContainer || { registeredBindings: new Lookup<Dependency, Binding<any>>(), resolve() { } };
-    fallbackResolve.registeredBindings.getAll = function (key) {
-        let value = fallbackFn(key);
-        return parentContainer!.registeredBindings.getAll(key)
+    return new FallbackContainer(fallbackFn, parentContainer);
+}
+
+class FallbackContainer implements IParentContainer {
+    private parentContainer: IParentContainer;
+    registeredBindings: IParentLookup<Dependency, Binding<any>>;
+
+    constructor(fallbackFn: (key: Dependency) => any, parentContainer?: IParentContainer) {
+        this.parentContainer = parentContainer || { registeredBindings: new Lookup<Dependency, Binding<any>>(), resolve() { } };
+        this.registeredBindings = new FallbackContainerLookup(fallbackFn, this.parentContainer.registeredBindings);
+    }
+
+    resolve(key: Dependency) {
+        return this.parentContainer.resolve(key);
+    }
+}
+
+class FallbackContainerLookup implements IParentLookup<Dependency, Binding<any>> {
+    constructor(private fallbackFn: (key: Dependency) => any, private parentLookup: IParentLookup<Dependency, Binding<any>>) { }
+
+    get(key: Dependency): Binding<any> | undefined {
+        let value = this.fallbackFn(key);
+        return isDefined(value)
+            ? bind().toValue(value)
+            : this.parentLookup.get(key);
+    }
+
+    getAll(key: Dependency): Binding<any>[] {
+        let value = this.fallbackFn(key);
+        return this.parentLookup.getAll(key)
             .concat(isDefined(value) ? [bind().toValue(value)] : []);
-    };
-    return fallbackResolve;
+    }
 }
 
 interface IParentContainer {
-    registeredBindings: Lookup<Dependency, Binding<any>>;
+    registeredBindings: IParentLookup<Dependency, Binding<any>>;
     resolve(key: Dependency): any;
 }
 
@@ -104,7 +128,7 @@ export class Container implements IParentContainer, IDisposable {
         this.registeredBindings = new Lookup(keyBindingPairs, parentContainer && parentContainer.registeredBindings);
 
         if (parentContainer)
-            parentContainer.resolve(bind().toValue(this));
+            parentContainer.resolve(bind().toValue(this).once());
     }
 
     resolve<T>(ctor: Constructor<T>): T
@@ -120,7 +144,10 @@ export class Container implements IParentContainer, IDisposable {
 
         resolveChain.push(key);
         try {
-            return this.defaultBinding(key).build(this, this.scope);
+            let result = this.defaultBinding(key).build(this, this.scope);
+            if (notDefined(result))
+                throw new Error(name(key) + " resolved to undefined" + resolveChainMessage());
+            return result;
         } finally {
             resolveChain.pop();
         }
@@ -129,7 +156,7 @@ export class Container implements IParentContainer, IDisposable {
     resolveFunction<T>(fn: Func<T>, localKeys: Dependency[] = [], localValues: any[] = []) {
         let self = this;
         return function (...args: any[]): T {
-            return fn.apply(this, self.resolveDependencies(dependencyKeys(fn), localKeys || [], localValues || []).concat(args));
+            return fn.apply(this, self.resolveDependencies(dependencies(fn), localKeys || [], localValues || []).concat(args));
         }
     }
 
@@ -143,7 +170,7 @@ export class Container implements IParentContainer, IDisposable {
 
         if (isFunction(key))
             return this.registeredBindings.add(key, bind(key).toType(key).perContainer());
-        
+
         throw new Error('Failed to resolve key ' + name(key) + resolveChainMessage());
     }
 
@@ -152,27 +179,36 @@ export class Container implements IParentContainer, IDisposable {
         return required.map(dep => localLookup(dep, () => this.resolve(dep)));
     }
 
-    dispose() { 
+    dispose() {
         this.scope.dispose();
     }
 }
 
 export class Binding<T> implements Binding<T> {
     private constructor(
-        private readonly _keys: Dependency[],
+        private readonly _keys: BindableKey[],
         private readonly _factory: Func<T>,
         private readonly _lifeTime: (factory: Func<T>, registeredResolve: Container, registeredScope: Scope, resolve: Container, currentScope: Scope) => T) {
-        this.perContainer();
     }
 
-    static from(keys: Dependency[]) {
-        return new Binding(keys, () => { throw new Error("No factory for binding") }, (f, rr, rs, r, s) => { throw new Error() })
-            .perContainer();
+    static from(keys: BindableKey[]) {
+        let invalidKeys = keys.filter(k => !isBindableKey(k));
+        if (invalidKeys.length)
+            throw new Error(String(invalidKeys[0]) + " is not a valid key to bind to");
+
+        let factory = keys.length == 1 && isFunction(keys[0])
+            ? constructor(keys[0] as Constructor<any>)
+            : () => { throw new Error("No factory for binding"); };
+        let binding = new Binding(keys, factory, (f, rr, rs, r, s) => { throw new Error() });
+        return keys.length
+            ? binding.perContainer()
+            : binding.perDependency();
     }
 
     get keys() { return this._keys; }
 
     to(factory: (container: Container) => T) {
+        verifyIsFunction(factory, "Factory");
         return this.withFactory(() => dependant([Container], (c: Container) => factory(c)));
     }
 
@@ -181,14 +217,19 @@ export class Binding<T> implements Binding<T> {
     }
 
     toType(type: Constructor<T>) {
+        verifyIsFunction(type, "Constructor");
         return this.withFactory(() => constructor(type))
     }
 
     toValue(value: T) {
-        return this.withFactory(() => () => value);
+        if (notDefined(value))
+            throw new Error("Value is undefined");
+        return new Binding<T>(this._keys, () => value, factory => factory());
     }
 
     toFunction(fn: Func<any>) {
+        if (this.keys.some(k => isFunction(k)))
+            throw new Error("Only strings and symbols can be bound to functions");
         return this.withFactory(() => dependant([Container, locals], (c: Container, local: Locals) => c.resolveFunction(fn, local.keys, local.values) as any as T));
     }
 
@@ -214,24 +255,26 @@ export class Binding<T> implements Binding<T> {
     }
 
     then(callback: (value: T) => void) {
-        return this.withFactory(innerFactory => dependant(dependencyKeys(innerFactory), (...args: any[]) => {
+        return this.withFactory(innerFactory => dependant(dependencies(innerFactory), (...args: any[]) => {
             let value = innerFactory(...args);
             callback(value);
             return value;
         }));
     }
 
-    useParameterHook(hook: (container: Container, key: Dependency) => any) {
+    useParameterHook(hook: (container: Container, dep: Dependency) => any) {
+        verifyIsFunction(hook, "Parameter hook");
+
         return this.withFactory(innerFactory => dependant([Container, locals], (c: Container, local: Locals) => {
-            let originalKeys = dependencyKeys(innerFactory);
-            let hookedKeys = originalKeys.map(key => {
-                let hookValue = hook(c, key);
+            let originalDependencies = dependencies(innerFactory);
+            let hookedDependencies = originalDependencies.map(dep => {
+                let hookValue = hook(c, dep);
                 return isDefined(hookValue)
                     ? bind().toValue(hookValue)
-                    : key;
+                    : dep;
             });
 
-            return c.resolveFunction(dependant(hookedKeys, (...args: any[]) => innerFactory(...args)), local.keys, local.values)();
+            return c.resolveFunction(dependant(hookedDependencies, (...args: any[]) => innerFactory(...args)), local.keys, local.values)();
         }));
     }
 
@@ -244,7 +287,7 @@ export class Binding<T> implements Binding<T> {
     }
 
     withArguments(...args: any[]) {
-        return this.withFactory(innerFactory => dependant(dependencyKeys(innerFactory).slice(args.length), (...rest: any[]) => innerFactory(...args, ...rest)));
+        return this.withFactory(innerFactory => dependant(dependencies(innerFactory).slice(args.length), (...rest: any[]) => innerFactory(...args, ...rest)));
     }
 
     build(container: Container, scope: Scope) {
@@ -262,7 +305,7 @@ function resolveChainMessage() {
         : '';
 }
 
-function dependencyKeys(ctor: any): Dependency[] { // TODO typing
+function dependencies(ctor: any): Dependency[] { // TODO typing
     return ctor.dependencies || [];
 }
 
@@ -277,20 +320,22 @@ class Scope {
 
     get<T>(key: Binding<T> | null, resolveForKey: () => any) {
         let value = key ? this.lookup.get(key) : undefined;
-        if (value == undefined) {
-            value = resolveForKey();
-            return key || isDisposable(value)
-                ? this.lookup.add(key, this.disposable(key, value))
-                : value
-        }
+        if (value != undefined)
+            return value;
+        value = resolveForKey();
+        return key || isDisposable(value)
+            ? this.lookup.add(key, this.disposable(key, value))
+            : value
     }
 
     private disposable<T>(key: Binding<T> | null, value: any) {
-        if (isDisposable(value))
+        if (isDisposable(value)) {
+            let innerDispose = value.dispose;
             value.dispose = () => {
-                value.dispose();
                 this.lookup.remove(key, value);
+                innerDispose.call(value);
             };
+        }
         return value;
     }
 
@@ -303,7 +348,7 @@ class Scope {
 
 function isDisposable(value: any): value is IDisposable {
     return value
-        && isFunction(value.disposable);
+        && isFunction(value.dispose);
 }
 
 interface IDisposable {
@@ -321,11 +366,16 @@ function newLocalLookup(keys: Dependency[], values: any[]) {
     };
 }
 
-class Lookup<TKey, TValue> {
-    private parent: { get(key: TKey): TValue | undefined; getAll(key: TKey): TValue[] };
+interface IParentLookup<TKey, TValue> {
+    get(key: TKey): TValue | undefined;
+    getAll(key: TKey): TValue[];
+}
+
+class Lookup<TKey, TValue> implements IParentLookup<TKey, TValue> {
+    private parent: IParentLookup<TKey, TValue>;
     private map = new Map<TKey, TValue[]>();
 
-    constructor(initialEntries: [TKey, TValue][] = [], parent?: Lookup<TKey, TValue>) {
+    constructor(initialEntries: [TKey, TValue][] = [], parent?: IParentLookup<TKey, TValue>) {
         this.parent = parent || { get(key: TKey) { return undefined; }, getAll(key: TKey) { return []; } };
         initialEntries.forEach(([key, value]) => this.add(key, value));
     }
@@ -366,7 +416,9 @@ export function makeFactory<T>(key: Dependency, funcDependencies?: Dependency[])
 export function makeFactory<T>(key: Dependency, funcDependencies: Dependency[] = []): Binding<Func<T>> {
     return bind<Func<T>>().to(c => (...args: any[]) => {
         let defaultBinding = c.defaultBinding(key);
-        let bindingWithSuppliedLocals = defaultBinding.withFactory(innerFactory => c.resolveFunction(innerFactory, funcDependencies, args)())
+        let bindingWithSuppliedLocals = defaultBinding
+            .withFactory(innerFactory => () => c.resolveFunction(innerFactory, funcDependencies, args)())
+            .perDependency();
         return c.resolve(bindingWithSuppliedLocals);
     });
 }
@@ -386,14 +438,14 @@ function defaultArg<T>(arg: T | undefined, defaultValue: T) {
 }
 
 function constructor<T>(fn: Constructor<T>): Func<T> {
-    return dependant(dependencyKeys(fn), (...args: any[]) => Reflect.construct(fn, args));
+    return dependant(dependencies(fn), (...args: any[]) => Reflect.construct(fn, args));
 }
 
 export function dependant<T extends Function>(dependencies: Dependency[], fn: T) {
     if (dependencies.some(notDefined))
         throw new Error(name(fn) + " has an undefined dependency");
 
-    return Object.assign(fn, { dependencies: dependencies, isDependantFn: true });
+    return Object.assign(fn, { dependencies: dependencies });
 }
 
 function flatMap<TIn, TOut>(array: TIn[], mapFn: (item: TIn) => TOut[]): TOut[] {
@@ -404,13 +456,19 @@ function last<T>(array: T[]): T {
     return array[array.length - 1];
 }
 
-function isConstructor(fn: any): fn is Function {
-    return isFunction(fn)
-        && !fn.isDependantFn;
+function isBindableKey(key: BindableKey): key is BindableKey {
+    return isFunction(key)
+        || typeof key == 'string'
+        || typeof key == 'symbol';
 }
 
 function isBinding(dep: Dependency): dep is Binding<any> {
     return !!(dep as Binding<any>).build;
+}
+
+function verifyIsFunction(fn: Function, name: string) {
+    if (!isFunction(fn))
+        throw new Error(name + " is not a function");
 }
 
 function isFunction(fn: any): fn is Function {

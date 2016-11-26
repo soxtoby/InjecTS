@@ -20,5 +20,7 @@ obj/
 [Rr]elease*/
 _ReSharper*/
 .vscode/
-src/*.js
+src/*.js*
+tests/*.js*
 node_modules/*
+jspm_packages/*
