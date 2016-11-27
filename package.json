@@ -19,6 +19,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^3.4.34",
+    "@types/reflect-metadata": "0.0.5",
     "@types/sinon": "^1.16.32",
     "@types/sinon-chai": "^2.7.27",
     "jspm": "^0.16.48"
