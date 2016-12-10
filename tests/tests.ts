@@ -4,7 +4,7 @@ import * as sinonChai from "sinon-chai";
 import "./sinon-basil";
 import "./lib/basil/basil-browser-runner";
 import "reflect-metadata";
-import * as inject from "../src/injec";
+import * as inject from "injec";
 
 let expect = chai.expect;
 chai.should();

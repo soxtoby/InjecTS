@@ -13,6 +13,10 @@
             "es2015.symbol",
             "es2017.object",
             "es2015.reflect"
-        ]
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "injec": ["src/injec"]
+        }
     }
 }

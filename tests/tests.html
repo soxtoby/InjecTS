@@ -6,6 +6,11 @@
     <script src="/jspm_packages/system.js"></script>
     <script src="/config.js"></script>
     <script>
+        System.config({
+            paths: {
+                'injec': '/src/injec'
+            }
+        })
         System.import("./tests");
     </script>
 </head>

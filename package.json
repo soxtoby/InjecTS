@@ -8,7 +8,8 @@
     "packages": "jspm_packages"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "build.sh",
+    "test": "live-server --open=tests/tests.html"
   },
   "keywords": [
     "dependency",
