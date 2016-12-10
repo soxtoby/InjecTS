@@ -10,7 +10,7 @@ let expect = chai.expect;
 chai.should();
 chai.use(sinonChai);
 
-describe("inject.js", function () {
+describe("injecTS", function () {
     class type { }
     class dependency1 { }
     class dependency2 { }
@@ -499,7 +499,7 @@ describe("inject.js", function () {
                 });
             });
         });
-        
+
         when("binding multiple types to the same type", () => {
             let binding = inject.bind(type, subType).toType(subType);
             let sut = new inject.Container([binding]);
@@ -1028,6 +1028,83 @@ describe("inject.js", function () {
         }
     });
 
+    describe("decorators", () => {
+        describe("@Injectable", function () {
+            @inject.Injectable
+            class InjectableClass {
+                constructor(public d1: dependency1, public d2: dependency2) { }
+            }
+
+            then("constructor parameter types resolved", () => {
+                let result = new inject.Container().resolve(InjectableClass);
+                result.d1.should.be.an.instanceOf(dependency1);
+                result.d2.should.be.an.instanceOf(dependency2);
+            });
+        });
+
+        describe("@Named", () => {
+            @inject.Injectable
+            class ClassWithNamedDependency {
+                constructor( @inject.Named('foo') public dependency: type) { }
+            }
+            let container = new inject.Container([inject.bind('foo').toValue('expected')]);
+
+            then("name overrides parameter type", () => container.resolve(ClassWithNamedDependency).dependency.should.equal('expected'));
+        });
+
+        describe("@Optional", function () {
+            @inject.Injectable
+            class ClassWithOptionalDependency {
+                constructor( @inject.Optional(type, 'expected') public dependency: type | string) { }
+            }
+
+            when("dependency has been registered", () => {
+                let container = new inject.Container([inject.bind(type)]);
+                let result = container.resolve(ClassWithOptionalDependency);
+
+                then("registered dependency resolved", () => result.dependency.should.be.an.instanceOf(type));
+            });
+
+            when("dependency hasn't been registered", () => {
+                let container = new inject.Container();
+                let result = container.resolve(ClassWithOptionalDependency);
+                
+                then("dependency resolves to specified default", () => result.dependency.should.equal('expected'));
+            });
+        });
+
+        describe("@All", function () {
+            @inject.Injectable
+            class ClassWithAllRegisteredDependencies {
+                constructor( @inject.All(type) public dependencies: type[]) { }
+            }
+            let dep1 = new type();
+            let dep2 = new type();
+            let container = new inject.Container([
+                inject.bind(type).toValue(dep1),
+                inject.bind(type).toValue(dep2)
+            ]);
+
+            then("all bindings for dependency are resolved", () => container.resolve(ClassWithAllRegisteredDependencies).dependencies.should.have.members([dep1, dep2]));
+        });
+
+        describe("@Factory", function () {
+            @inject.Injectable
+            class ClassWithFactory {
+                constructor( @inject.Factory(typeWithDependencies, [dependency1]) public dependency: (dep1: dependency1) => typeWithDependencies) { }
+            }
+
+            then("factory function resolved", () => {
+                let result = new inject.Container().resolve(ClassWithFactory);
+                let arg = new dependency1();
+                let factoryResult = result.dependency(arg);
+
+                factoryResult.dependency1.should.equal(arg);
+                factoryResult.dependency2.should.be.an.instanceOf(dependency2);
+            });
+        });
+    });
+
     describe("errors", () => {
         when("container built with nothing registered", () => {
             let sut = new inject.Container();
@@ -1043,7 +1120,7 @@ describe("inject.js", function () {
             when("resolving type with an unregistered named dependency", () => {
                 @inject.Injectable
                 class typeWithNamedDependency {
-                    constructor(@inject.Named('unregistered')  d1: any) { }
+                    constructor( @inject.Named('unregistered') d1: any) { }
                 }
                 let action = () => { sut.resolve(typeWithNamedDependency); };
 
@@ -1093,9 +1170,9 @@ describe("inject.js", function () {
 
         when("resolve error occurs with multiple resolves in chain", () => {
             @inject.Injectable
-            class three { constructor(@inject.Named('four') d: any) { } }
+            class three { constructor( @inject.Named('four') d: any) { } }
             @inject.Injectable
-            class two { constructor(@inject.Named('three') d: any) { } }
+            class two { constructor( @inject.Named('three') d: any) { } }
             @inject.Injectable
             class one { constructor(d: two) { } }
 
