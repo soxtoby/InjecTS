@@ -1,7 +1,20 @@
 {
   "name": "injec-ts",
   "version": "1.0.0",
-  "description": "Dependency injection for TypeScript",
+  "description": "Dependency injection library for TypeScript",
+  "keywords": [
+    "dependency",
+    "injection",
+    "typescript"
+  ],
+  "author": "Simon Oxtoby",
+  "license": "MIT",
+  "homepage": "https://github.com/soxtoby/InjecTS",
+  "bugs": "https://github.com/soxtoby/InjecTS/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soxtoby/InjecTS.git"
+  },
   "main": "lib/injec.js",
   "directories": {
     "lib": "lib"
@@ -10,13 +23,6 @@
     "build": "build.sh",
     "test": "live-server --open=tests/tests.html"
   },
-  "keywords": [
-    "dependency",
-    "injection",
-    "typescript"
-  ],
-  "author": "Simon Oxtoby",
-  "license": "MIT",
   "dependencies": {
     "@types/reflect-metadata": "0.0.5",
     "reflect-metadata": "^0.1.8"
