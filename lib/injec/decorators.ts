@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { Constructor, Func, isDefined } from './types';
 import { getDependencies, Dependency } from './dependencies';
 import { Binding, bind } from './binding';
@@ -12,7 +13,7 @@ export const Injectable: ClassDecorator = (ctor: Function) => {
     return ctor;
 };
 
-interface ConstructorParameterDecorator {
+export interface ConstructorParameterDecorator {
     (target: Function, propertyKey: undefined, parameterIndex: number): void;
 }
 

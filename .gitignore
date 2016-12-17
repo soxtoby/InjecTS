@@ -20,8 +20,10 @@ obj/
 [Rr]elease*/
 _ReSharper*/
 .vscode/
-src/**/*.js*
+lib/**/*.js*
+lib/**/*.d.ts
 tests/*.js*
+tests/*.d.ts
 node_modules/*
 jspm_packages/*
 dist/*

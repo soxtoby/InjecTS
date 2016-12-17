@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { notDefined } from './types';
 import { Binding, BindableKey } from './binding';
 import { name } from './utils';

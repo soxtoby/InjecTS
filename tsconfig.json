@@ -8,6 +8,7 @@
         "strictNullChecks": true,
         "target": "es5",
         "sourceMap": true,
+        "declaration": true,
         "lib": [
             "es2015",
             "es2015.symbol",
@@ -16,7 +17,7 @@
         ],
         "baseUrl": ".",
         "paths": {
-            "injec": ["src/injec"]
+            "injec": ["lib/injec"]
         }
     }
 }

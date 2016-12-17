@@ -1,11 +1,10 @@
 {
-  "name": "injects",
+  "name": "injec-ts",
   "version": "1.0.0",
   "description": "Dependency injection for TypeScript",
-  "main": "src/injec.js",
+  "main": "lib/injec.js",
   "directories": {
-    "test": "tests",
-    "packages": "jspm_packages"
+    "lib": "lib"
   },
   "scripts": {
     "build": "build.sh",
@@ -18,23 +17,30 @@
   ],
   "author": "Simon Oxtoby",
   "license": "MIT",
+  "dependencies": {
+    "@types/reflect-metadata": "0.0.5",
+    "reflect-metadata": "^0.1.8"
+  },
   "devDependencies": {
     "@types/chai": "^3.4.34",
-    "@types/reflect-metadata": "0.0.5",
     "@types/sinon": "^1.16.32",
     "@types/sinon-chai": "^2.7.27",
     "jspm": "^0.16.48"
   },
+  "files": [
+    "lib"
+  ],
   "jspm": {
     "directories": {
       "test": "tests"
     },
     "dependencies": {
+      "reflect-metadata": "npm:reflect-metadata@^0.1.8"
+    },
+    "devDependencies": {
       "chai": "npm:chai@^3.5.0",
-      "reflect-metadata": "npm:reflect-metadata@^0.1.8",
       "sinon": "npm:sinon@^1.17.6",
       "sinon-chai": "npm:sinon-chai@^2.8.0"
-    },
-    "devDependencies": {}
+    }
   }
 }

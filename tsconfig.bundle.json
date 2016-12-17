@@ -5,6 +5,6 @@
         "module": "amd"
     },
     "files": [
-        "src/injec.ts"
+        "lib/injec.ts"
     ]
 }

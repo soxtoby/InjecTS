@@ -10,7 +10,7 @@ let expect = chai.expect;
 chai.should();
 chai.use(sinonChai);
 
-describe("injecTS", function () {
+describe("InjecTS", function () {
     class type { }
     class dependency1 { }
     class dependency2 { }
