@@ -19,7 +19,7 @@ npm install injec-ts
 
 2. Import and construct a container
 ```ts
-import { Container } from 'injec-ts/injec`;
+import { Container } from 'injec-ts/injec';
 let container = new Container();
 ```
 
