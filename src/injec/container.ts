@@ -53,7 +53,7 @@ export class Container implements IParentContainer, IDisposable {
 
     resolveFunction<T>(fn: Func<T>, localKeys: Dependency[] = [], localValues: any[] = []) {
         let self = this;
-        return function (...args: any[]): T {
+        return function (this: any, ...args: any[]): T {
             return fn.apply(this, self.resolveDependencies(getDependencies(fn), localKeys || [], localValues || []).concat(args));
         }
     }

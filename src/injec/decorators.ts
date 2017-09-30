@@ -3,7 +3,7 @@ import { Constructor, Func, isDefined } from './types';
 import { getDependencies, Dependency } from './dependencies';
 import { Binding, bind } from './binding';
 
-export const Injectable: ClassDecorator = (ctor: Function) => {
+export const Injectable: ClassDecorator = <T extends Function>(ctor: T) => {
     let ctorParamTypes: Constructor<any>[] = Reflect.getMetadata('design:paramtypes', ctor) || [];
     ctorParamTypes.forEach((type, parameterIndex) => {
         let deps = getDependencies(ctor);

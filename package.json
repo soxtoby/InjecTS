@@ -1,6 +1,6 @@
 {
   "name": "injec-ts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Dependency injection library for TypeScript",
   "keywords": [
     "dependency",
@@ -15,7 +15,8 @@
     "type": "git",
     "url": "https://github.com/soxtoby/InjecTS.git"
   },
-  "main": "lib/injec.js",
+  "main": "lib/injec",
+  "types": "lib/injec",
   "directories": {
     "lib": "lib"
   },

@@ -20,8 +20,7 @@ obj/
 [Rr]elease*/
 _ReSharper*/
 .vscode/
-lib/**/*.js*
-lib/**/*.d.ts
+lib
 tests/*.js*
 tests/*.d.ts
 node_modules/*

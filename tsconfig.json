@@ -4,10 +4,10 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "module": "commonjs",
-        "noImplicitAny": true,
-        "strictNullChecks": true,
+        "strict": true,
         "target": "es5",
         "sourceMap": true,
+        "outDir": "lib",
         "declaration": true,
         "lib": [
             "es2015",
@@ -19,5 +19,8 @@
         "paths": {
             "injec": ["lib/injec"]
         }
-    }
+    },
+    "include": [
+        "./src/**/*"
+    ]
 }

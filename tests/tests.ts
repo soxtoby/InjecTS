@@ -4,13 +4,13 @@ import * as sinonChai from "sinon-chai";
 import "./sinon-basil";
 import "./lib/basil/basil-browser-runner";
 import "reflect-metadata";
-import * as inject from "injec";
+import * as inject from "../src/injec";
 
 let expect = chai.expect;
 chai.should();
 chai.use(sinonChai);
 
-describe("InjecTS", function () {
+describe("InjecTS", function (this: sinon.SinonSandbox) {
     class type { }
     class dependency1 { }
     class dependency2 { }

@@ -4,7 +4,7 @@ import { IParentLookup, Lookup } from './lookup';
 import { Binding, bind } from './binding';
 import { isDefined } from './types';
 
-export function fallback(fallbackFn: (key: Dependency) => any, parentContainer?: IParentContainer) {
+export function fallback(fallbackFn: (key: Dependency) => any, parentContainer?: IParentContainer): IParentContainer {
     return new FallbackContainer(fallbackFn, parentContainer);
 }
 
